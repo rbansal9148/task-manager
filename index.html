@@ -1,0 +1,225 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+    <meta charset="UTF-8">
+    <title>Task Manager</title>
+    <style>
+        .heading-container {
+            width: 100%;
+            display: flex;
+            justify-content: center;
+            margin-bottom: 20px;
+        }
+        .btn-primary {
+            background-color: #9d80bf;
+            color: #fff;
+            border: 1px solid #9d80bf;
+            border-radius: 5px;
+            padding-top: 3px;
+            padding-bottom: 3px;
+            font-size: 11px;
+            margin: 3px;
+        }
+        .btn-secondary {
+            background-color: #fff;
+            color: #9d80bf;
+            border: 1px solid #9d80bf;
+            border-radius: 5px;
+            padding-top: 3px;
+            padding-bottom: 3px;
+            font-size: 11px;
+            margin: 3px;
+        }
+        .heading {
+            color: #79589f;
+            font-size: 30px;
+        }
+        .actions-container {
+            display: flex;
+            justify-content: center;
+            width: 100%;
+            margin-bottom: 20px;
+        }
+        .action {
+            width: 10%;
+            display: flex;
+            justify-content: center;
+        }
+        .task {
+            border: 4px solid #79589f;
+            width: 80%;
+            border-radius: 7px;
+            margin-left: auto;
+            margin-right: auto;
+            margin-bottom: 10px;
+        }
+        .tasks-container {
+            margin: auto;
+        }
+        .task-bar {
+            background-color: #79589f;
+            padding: 3px 7px 3px 7px;
+            color: #fff;
+        }
+        .waiting-bar {
+            background-color: #fff;
+            padding: 3px 7px 3px 7px;
+            color: #79589f;
+        }
+        .server-counter-container {
+            color: #79589f;
+            padding-top: 10px;
+        }
+        .add-task-number {
+            border: 1px solid #79589f;
+            width: 50px;
+            padding: 10px;
+            border-radius: 3px;
+            height: 13px;
+            margin-top: 3px;
+        }
+    </style>
+</head>
+<body>
+    <div class="heading-container">
+        <div class="heading">
+            Task Manager
+        </div>
+    </div>
+    <div class="actions-container">
+        <div class="action">
+            <div class="server-counter-container">Server: <span id="server-counter">0</span></div>
+        </div>
+        <div class="action">
+            <button class="btn-primary" onclick="handleAddServer();">Add Server</button>
+        </div>
+        <div class="action">
+            <button class="btn-secondary" onclick="handleRemoveServer();">Remove Server</button>
+        </div>
+        <div class="action">
+            <input type="number" id="add-task-number" class="add-task-number" /> <button class="btn-primary" onclick="handleAddTask();">Add Tasks</button>
+        </div>
+    </div>
+    <div id="tasks-container" class="tasks-container"></div>
+    <script>
+        var servers = [];
+        var tasks = [];
+
+        var serverDeletionCounter = 0;
+        var serverAdditionCounter = 1;
+
+        var defaultExecutionSeconds = 20;
+
+        function getTaskHtml(t) {
+            if (!t.inProgress) {
+                return `<div class="task"><div class="waiting-bar">waiting...</div></div>`;
+            }
+            return `<div class="task"><div class="task-bar">00:${parseInt((t.dueIn - Date.now())/1000).toString().padStart(2, "0")}</div></div>`;
+        }
+
+        function renderTasks () {
+            var tasksContainer = document.getElementById('tasks-container');
+            tasksContainer.querySelectorAll('*').forEach(n => n.remove());
+            tasks.forEach((t) => {
+                tasksContainer.insertAdjacentHTML('beforeend',this.getTaskHtml(t));
+            });
+        }
+
+        function handleAddServer() {
+            serverAdditionCounter++;
+        }
+
+        function addServer() {
+            servers.push({
+                id: Date.now(),
+                inProgress: false,
+                task: null,
+            });
+            serverAdditionCounter--;
+            document.getElementById('server-counter').innerText = servers.length;
+        }
+
+        function addTask(executionTime) {
+            tasks.push({
+                executionTime,
+                dueIn: null,
+                inProgress: false,
+                server: null
+            });
+        }
+
+        function handleRemoveServer() {
+            serverDeletionCounter++;
+        }
+
+        function handleAddTask() {
+            var tasksNumber = parseInt(document.getElementById('add-task-number').value);
+            if (tasksNumber) {
+                while (tasksNumber--) {
+                    addTask(defaultExecutionSeconds);
+                }
+            }
+        }
+
+        function removeServer() {
+            if (serverDeletionCounter) {
+                var unusedServer = servers.find((s) => (!s.inProgress));
+                if (unusedServer) {
+                    servers.splice(unusedServer, 1);
+                    serverDeletionCounter--;
+                    document.getElementById('server-counter').innerText = servers.length;
+                }
+            }
+        }
+
+        function checkAndRemoveForCompletedTasks () {
+            var toBeRemovedIndexes = [];
+            tasks.forEach((t, index) => {
+                if (t.inProgress && t.dueIn <= Date.now()) {
+                    toBeRemovedIndexes.push(index);
+                    t.server.inProgress = false;
+                }
+            });
+            toBeRemovedIndexes.forEach((t) => {
+                tasks.splice(t, 1);
+            });
+        }
+
+        function checkAndAssignTasks() {
+            const pendingTasks = tasks.filter((t) => (!t.inProgress));
+            if (pendingTasks.length) {
+                pendingTasks.forEach((t) => {
+                    const unusedServer = servers.find(s => (!s.inProgress));
+                    console.log(unusedServer, servers, 'unusedServer');
+                    if (unusedServer) {
+                        t.inProgress = true;
+                        t.dueIn = Date.now() + (t.executionTime*1000);
+                        t.server = unusedServer;
+                        unusedServer.task = t;
+                        unusedServer.inProgress = true;
+                    }
+                });
+            }
+        }
+
+        function initialize() {
+            console.log('initialize', { serverAdditionCounter, serverDeletionCounter });
+            // Add any severs
+            while (this.serverAdditionCounter > 0) addServer();
+
+            this.checkAndRemoveForCompletedTasks();
+
+            // Delete Servers
+            let serverDeletionCounterTemp = serverDeletionCounter;
+            while (serverDeletionCounterTemp) {
+                removeServer();
+                serverDeletionCounterTemp--;
+            }
+            this.checkAndAssignTasks();
+            this.renderTasks();
+        }
+
+        setInterval(initialize, 1000);
+    </script>
+</body>
+</html>
